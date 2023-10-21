@@ -4,15 +4,15 @@ import type { AppProps } from 'next/app';
 import '@rainbow-me/rainbowkit/styles.css';
 import { getDefaultWallets, RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { configureChains, createConfig, sepolia, WagmiConfig } from 'wagmi';
-import { mainnet, polygon, polygonMumbai, goerli, optimism, arbitrum, zora, arbitrumGoerli, optimismGoerli } from 'wagmi/chains';
+import { mainnet, polygon, polygonMumbai, goerli, optimism, arbitrum, zora, arbitrumGoerli, optimismGoerli, lineaTestnet } from 'wagmi/chains';
 import { alchemyProvider } from 'wagmi/providers/alchemy';
 import { publicProvider } from 'wagmi/providers/public';
 import Script from 'next/script';
 // import { Linea } from '@/utils/linea';
-import { MetaMaskContextProvider } from '@/utils/hooks/useMetaMask';
+import { MetaMaskContextProvider } from '@/utils/hooks/useMetamask';
 
 const { chains, publicClient } = configureChains(
-  [mainnet, optimism, polygon, arbitrum, goerli, polygonMumbai, sepolia, optimismGoerli],
+  [goerli, polygonMumbai, optimismGoerli, lineaTestnet],
   // [mainnet, polygon, optimism, arbitrum, zora],
   [
     // alchemyProvider({ apiKey: process.env.ALCHEMY_ID }),
@@ -35,12 +35,12 @@ const wagmiConfig = createConfig({
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <MetaMaskContextProvider>
-      <WagmiConfig config={wagmiConfig}>
-        <RainbowKitProvider chains={chains}>
-          <Component {...pageProps} />
-        </RainbowKitProvider>
-      </WagmiConfig>
-    </MetaMaskContextProvider>
+    // <MetaMaskContextProvider>
+    <WagmiConfig config={wagmiConfig}>
+      <RainbowKitProvider chains={chains}>
+        <Component {...pageProps} />
+      </RainbowKitProvider>
+    </WagmiConfig>
+    // </MetaMaskContextProvider>
   );
 }
