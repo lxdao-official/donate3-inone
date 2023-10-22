@@ -1,8 +1,8 @@
 # Link
 
 goerli->opGoerli: https://testnet.axelarscan.io/transfer/0x68c61a5ec6805779ffd0e768a2703b3cd60f7ac3734aabef2bbc3873eb3e373a
-goerli->polygon: https://testnet.axelarscan.io/account/0xb9766bD52a2fA4e089e7aacAD705Ed21bC0aDc07 https://testnet.axelarscan.io/account/0x22cBB2D484982A7a24281469a54c5Ce056cF7E25
-goerli->goerli: https://testnet.axelarscan.io/account/0xbeb57cD2aB0411583Bf0d0d210548da71b687e89
+goerli->polygon: https://testnet.axelarscan.io/transfer/0x988d7538da22d0e9fa88b99ba48d09f36608345cd5c9fd6a9e39e1bf782f5e81
+goerli->linea: https://testnet.axelarscan.io/transfer/0x6d0e492a5dd39edac6e9fd7b194bc0c6e2ec1104995c17c3409b26b51d4cb04a
 opGoerli->linea: https://testnet.axelarscan.io/transfer/0x20914b85ad37c8a9f68a07a005b21743759aa206fdca30428a293e95f66c5e81
 opGoerli->polygon: https://testnet.axelarscan.io/transfer/0x73804b459931e7df2fe8434990fdf307c2c69e8b20faae6297558759313d06ce
 
