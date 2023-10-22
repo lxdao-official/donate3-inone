@@ -1,22 +1,24 @@
 /* eslint-disable @next/next/no-img-element */
-import { useAccount, useNetwork } from 'wagmi'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import clsx from 'clsx'
-import {
-  useConnectModal,
-} from '@rainbow-me/rainbowkit';
+import type { IProvider } from "@web3auth/base";
+import { OpenloginAdapter } from '@web3auth/openlogin-adapter'
+import { Web3Auth, Web3AuthOptions } from '@web3auth/modal'
 
-import { useContractWrite, erc20ABI } from 'wagmi';
 import {
   AxelarAssetTransfer,
   CHAINS,
   Environment,
 } from "@axelar-network/axelarjs-sdk";
+import { Web3AuthNoModal } from "@web3auth/no-modal";
+import { CHAIN_NAMESPACES } from "@web3auth/base";
+import * as ethers from "ethers"
 
 // import { useMetaMask } from '@/utils/hooks/useMetamask';
 import { useRouter } from 'next/router';
+import RPC from '@/utils/RPC';
 
 interface Chain {
   name: string;
@@ -57,93 +59,231 @@ const coinType: ChainList = {
   },
 };
 
-
-const DonateBtn = ({ donateTo, amount, toChain }:
-  { donateTo: `0x${string}`, amount: number, toChain: string }) => {
-  // const { wallet, hasProvider, connectMetaMask } = useMetaMask();
-  const { chain } = useNetwork()
-  const { address } = useAccount()
-  const [loading, setLoading] = useState(false)
-  const a = chain?.id || 5
-  const { openConnectModal } = useConnectModal();
-
-
-  const { writeAsync } = useContractWrite({
-    address: '0x254d06f33bDc5b8ee05b2ea472107E300226659A',
-    abi: erc20ABI,
-    chainId: chain?.id,
-    functionName: 'transfer',
-  })
-
-  const handleDonate = async () => {
-    toast('🦄 Sending Donation!', {
-      position: "top-center",
-      autoClose: 5000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: "light",
-    });
-    setLoading(true)
-    try {
-      const destinationAddress = donateTo,
-        asset = "uausdc";  // denom of asset. See note (2) below
-      const sdk = new AxelarAssetTransfer(config);
-
-      const depositAddress = await sdk.getDepositAddress({
-        fromChain: coinType[a].axelarName || CHAINS.TESTNET.ETHEREUM,
-        toChain: coinType[toChain].axelarName,
-        destinationAddress,
-        asset
-      });
-
-      const tx = await writeAsync({
-        args: [
-          depositAddress as `0x${string}`,
-          BigInt(Math.floor(amount) * 1e6 || 10e6)
-        ]
-      })
-      toast.success(`success, tx=${tx.hash}`, {
-        position: "top-center",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "light",
-      });
-    } catch (error) {
-      console.log(error)
-      toast.error("Something Wrong happened!", {
-        position: "top-center",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "light",
-      });
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className={clsx((loading || amount == 0) ? 'cursor-not-allowed bg-[#9dbd3c]' : 'cursor-pointer bg-[#d0fb51]', 'rounded-full h-[40px] w-full text-center font-bold text-white leading-[40px] text-[24px]')} onClick={address ? handleDonate : openConnectModal}>
-      {address ? (loading ? 'Loading...' : `Support`) : 'Connect Metamask'}
-    </div>
-  );
-};
-
 export default function Home() {
   const [donation, setDonation] = useState(0)
   const { query } = useRouter()
-  const { chain } = useNetwork()
+  const clientId = 'BP8bji4wELSfVgjZeikRwOnWYbHAy7oAMXSIyQKDE7Gknao6ERHQaeGWuAG3fN_PTogvyaTI0Q_chfWMWzdnI5s';
+  const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
+  const [provider, setProvider] = useState<IProvider | null>(null)
+  const [address, setAddress] = useState<string>("")
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const web3auth = new Web3Auth({
+          clientId,
+          web3AuthNetwork: "testnet",
+          chainConfig: {
+            chainNamespace: CHAIN_NAMESPACES.EIP155,
+            chainId: "0x5",
+            rpcTarget: "https://rpc.ankr.com/eth_goerli",
+          },
+        });
 
+        const openloginAdapter = new OpenloginAdapter({
+          loginSettings: {
+            mfaLevel: "none",
+          },
+          adapterSettings: {
+          }
+        });
+        web3auth.configureAdapter(openloginAdapter);
+        setWeb3auth(web3auth);
+
+        await web3auth.initModal();
+
+        if (web3auth.provider) {
+          setProvider(web3auth.provider);
+        };
+
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    init();
+  }, []);
+
+  const login = async () => {
+    if (!web3auth) {
+      uiConsole("web3auth not initialized yet");
+      return;
+    }
+    const web3authProvider = await web3auth.connect();
+    setProvider(web3authProvider);
+
+    setAddress(await getAccounts())
+  };
+
+  const authenticateUser = async () => {
+    if (!web3auth) {
+      uiConsole("web3auth not initialized yet");
+      return;
+    }
+    const idToken = await web3auth.authenticateUser();
+    uiConsole(idToken);
+  };
+
+  const getUserInfo = async () => {
+    if (!web3auth) {
+      uiConsole("web3auth not initialized yet");
+      return;
+    }
+    const user = await web3auth.getUserInfo();
+    uiConsole(user);
+  };
+
+  const logout = async () => {
+    if (!web3auth) {
+      uiConsole("web3auth not initialized yet");
+      return;
+    }
+    await web3auth.logout();
+    setProvider(null);
+  };
+
+  const getChainId = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    const rpc = new RPC(provider);
+    const chainId = await rpc.getChainId();
+    uiConsole(chainId);
+  };
+  const getAccounts = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    const rpc = new RPC(provider);
+    const address = await rpc.getAccounts();
+    console.log(address)
+    return address
+  };
+
+  const getBalance = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    const rpc = new RPC(provider);
+    const balance = await rpc.getBalance();
+    uiConsole(balance);
+  };
+
+  const sendTransaction = async (address: string, token: string) => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    const rpc = new RPC(provider);
+    const receipt = await rpc.sendTransaction(address, token);
+    return receipt
+  };
+
+  const writeContract = async (address: string, token: string) => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    console.log(address, token)
+    const rpc = new RPC(provider);
+    const receipt = await rpc.writeContract(address, token);
+    return receipt
+  };
+
+  const signMessage = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    const rpc = new RPC(provider);
+    const signedMessage = await rpc.signMessage();
+    console.log(signedMessage)
+  };
+
+  const getPrivateKey = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    const rpc = new RPC(provider);
+    const privateKey = await rpc.getPrivateKey();
+    uiConsole(privateKey);
+  };
+
+  function uiConsole(...args: any[]): void {
+    const el = document.querySelector("#console>p");
+    if (el) {
+      el.innerHTML = JSON.stringify(args || {}, null, 2);
+    }
+  }
+  const DonateBtn = ({ donateTo, amount, toChain, address }:
+    { donateTo: `0x${string}`, amount: number, toChain: string, address: string }) => {
+    // const { wallet, hasProvider, connectMetaMask } = useMetaMask();
+    const [loading, setLoading] = useState(false)
+    const a = '5'
+
+
+    const handleDonate = async () => {
+      toast('🦄 Sending Donation!', {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      });
+      setLoading(true)
+      try {
+        const destinationAddress = donateTo,
+          asset = "uausdc";  // denom of asset. See note (2) below
+        const sdk = new AxelarAssetTransfer(config);
+        const depositAddress = await sdk.getDepositAddress({
+          fromChain: coinType[a].axelarName || CHAINS.TESTNET.ETHEREUM,
+          toChain: coinType[toChain].axelarName,
+          destinationAddress,
+          asset
+        });
+
+        let txn = await writeContract(depositAddress, ethers.parseUnits(amount.toString(), 6).toString())
+
+
+        toast.success(`success, tx=${txn.hash}`, {
+          position: "top-center",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+          theme: "light",
+        });
+      } catch (error) {
+        console.log(error)
+        toast.error("Something Wrong happened!", {
+          position: "top-center",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+          theme: "light",
+        });
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    return (
+      <div className={clsx((loading || amount == 0) ? 'cursor-not-allowed bg-[#9dbd3c]' : 'cursor-pointer bg-[#d0fb51]', 'rounded-full h-[40px] w-full text-center font-bold text-white leading-[40px] text-[24px]')} onClick={address ? handleDonate : login}>
+        {address ? (loading ? 'Loading...' : `Support`) : 'Connect Web3'}
+      </div>
+    );
+  };
   return (
     <main
       className="w-screen h-screen flex flex-col justify-center items-center"
@@ -153,7 +293,7 @@ export default function Home() {
         <div className='text-[24px] self-start font-semibold'>Donate <span className='text-[#717171]'>{query?.name || 'Donate3'}</span> aUSDC</div>
         <div className='flex gap-4 w-full items-center'>
           <div className='flex justify-center items-center gap-3 border  border-[#d0fb51] text-[12px] rounded-md w-[calc(50vw_-_240px)] h-[40px] p-2'>
-            <img className='w-[30px] h-[30px] bg-[#fff] rounded-full' src={chain?.id ? coinType[chain?.id + '']?.icon : '/icons/delete.png'} alt="" />{chain?.id ? coinType[chain?.id + '']?.name : 'NotConnect'}
+            <img className='w-[30px] h-[30px] bg-[#fff] rounded-full' src={5 ? coinType[5 + '']?.icon : '/icons/delete.png'} alt="" />{5 ? coinType[5 + '']?.name : 'NotConnect'}
           </div>
           <img width="20px" src="./ar.png" alt="" />
           <div className='flex justify-center items-center gap-3 border  border-[#d0fb51] text-[12px] rounded-md w-[calc(50vw_-_240px)] h-[40px] p-2'>
@@ -177,7 +317,7 @@ export default function Home() {
             onChange={(e: any) => setDonation(e.target.value)}
           ></input>
         </div>
-        <DonateBtn donateTo='0xb15115A15d5992A756D003AE74C0b832918fAb75' amount={donation} toChain={query.toChain as string || "420"} />
+        <DonateBtn donateTo='0xb15115A15d5992A756D003AE74C0b832918fAb75' amount={donation} toChain={query.toChain as string || "420"} address={address} />
         <div className='w-full p-2  rounded-lg border border-[#d0fb51] text-[#91ae39] bg-[#d0fb5166] gap-4'>
           Only supports mubai(80001), goerli(5), linea(59140), and op-goerli(420).<br />
           <span className='font-bold'>It will use 0.2USD as handling fee.</span>
