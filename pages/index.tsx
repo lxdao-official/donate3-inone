@@ -284,6 +284,7 @@ export default function Home() {
       </div>
     );
   };
+  console.log(query.toAddress)
   return (
     <main
       className="w-screen h-screen flex flex-col justify-center items-center"
@@ -317,7 +318,7 @@ export default function Home() {
             onChange={(e: any) => setDonation(e.target.value)}
           ></input>
         </div>
-        <DonateBtn donateTo='0xb15115A15d5992A756D003AE74C0b832918fAb75' amount={donation} toChain={query.toChain as string || "420"} address={address} />
+        <DonateBtn donateTo={typeof (query.toAddress) != 'undefined' ? query.toAddress as `0x${string}` : '0xb15115A15d5992A756D003AE74C0b832918fAb75'} amount={donation} toChain={query.toChain as string || "420"} address={address} />
         <div className='w-full p-2  rounded-lg border border-[#d0fb51] text-[#91ae39] bg-[#d0fb5166] gap-4'>
           Only supports mubai(80001), goerli(5), linea(59140), and op-goerli(420).<br />
           <span className='font-bold'>It will use 0.2USD as handling fee.</span>
