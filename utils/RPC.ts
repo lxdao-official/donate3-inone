@@ -1,5 +1,5 @@
 import type { IProvider } from "@web3auth/base";
-import { ethers } from "ethers";
+import { Signer, ethers } from "ethers";
 
 export default class EthereumRpc {
   private provider: IProvider;
@@ -34,6 +34,12 @@ export default class EthereumRpc {
     }
   }
 
+  async getSigner(): Promise<Signer> {
+    const ethersProvider = new ethers.BrowserProvider(this.provider);
+    const signer = await ethersProvider.getSigner();
+    return signer;
+  }
+
   async getBalance(): Promise<string> {
     try {
       const ethersProvider = new ethers.BrowserProvider(this.provider);
@@ -52,12 +58,12 @@ export default class EthereumRpc {
       return error as string;
     }
   }
-    
-  async writeContract(destination:string, amount: string): Promise<any> {
+
+  async writeContract(destination: string, amount: string): Promise<any> {
     const abi = [
-        "function transfer(address to, uint256 amount)"
+      "function transfer(address to, uint256 amount)"
     ]
-    
+
     const ethersProvider = new ethers.BrowserProvider(this.provider);
     const signer = await ethersProvider.getSigner();
     const contract = new ethers.Contract("0x254d06f33bDc5b8ee05b2ea472107E300226659A", abi, signer)
@@ -66,42 +72,34 @@ export default class EthereumRpc {
     const receipt = await tx.wait();
 
     return receipt;
-  
-}
 
-  async sendTransaction(destination:string, amount: string): Promise<any> {
-
-      const ethersProvider = new ethers.BrowserProvider(this.provider);
-      const signer = ethersProvider.getSigner();
-
-      // Submit transaction to the blockchain
-      const tx = await (
-        await signer
-      ).sendTransaction({
-        to: destination,
-        value: amount,
-      });
-
-      const receipt = await tx.wait();
-
-      return receipt;
-    
   }
 
-  async signMessage() {
-    try {
-      const ethersProvider = new ethers.BrowserProvider(this.provider);
-      const signer = ethersProvider.getSigner();
+  async sendTransaction(destination: string, amount: string): Promise<any> {
 
-      const originalMessage = "YOUR_MESSAGE";
+    const ethersProvider = new ethers.BrowserProvider(this.provider);
+    const signer = ethersProvider.getSigner();
 
-      // Sign the message
-      const signedMessage = await (await signer).signMessage(originalMessage);
+    // Submit transaction to the blockchain
+    const tx = await (
+      await signer
+    ).sendTransaction({
+      to: destination,
+      value: amount,
+    });
 
-      return signedMessage;
-    } catch (error) {
-      return error as string;
-    }
+    const receipt = await tx.wait();
+
+    return receipt;
+
+  }
+
+  async signMessage(msg: string) {
+    const ethersProvider = new ethers.BrowserProvider(this.provider);
+    const signer = ethersProvider.getSigner();
+    const signedMessage = await (await signer).signMessage(msg);
+
+    return signedMessage;
   }
 
   async getPrivateKey(): Promise<any> {
