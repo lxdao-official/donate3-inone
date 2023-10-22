@@ -62,7 +62,7 @@ const coinType: ChainList = {
 export default function Home() {
   const [donation, setDonation] = useState(0)
   const { query } = useRouter()
-  const clientId = 'BP8bji4wELSfVgjZeikRwOnWYbHAy7oAMXSIyQKDE7Gknao6ERHQaeGWuAG3fN_PTogvyaTI0Q_chfWMWzdnI5s';
+  const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID ?? "BPXXQzy4os6sTlpOrHSPbq3BFHeyTgtCKcxWrOOYxpO1Wzfk3AdsdG6MQikwdxBJtf0eJrxEmURYPflRB8CGv0A";
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
   const [provider, setProvider] = useState<IProvider | null>(null)
   const [address, setAddress] = useState<string>("")
