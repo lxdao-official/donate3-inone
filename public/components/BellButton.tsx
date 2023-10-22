@@ -1,4 +1,4 @@
-import { useUnreadState } from '@notifi-network/notifi-react-card';
+// import { useUnreadState } from '@notifi-network/notifi-react-card';
 import { FC } from 'react';
 
 import style from './BellButton.module.css';
@@ -8,14 +8,14 @@ type BellButtonProps = {
 };
 
 export const BellButton: FC<BellButtonProps> = ({ setIsCardOpen }) => {
-  const { hasUnreadNotification, unreadNotificationCount } = useUnreadState();
+  // const { hasUnreadNotification, unreadNotificationCount } = useUnreadState();
   return (
     <div
       onClick={() => setIsCardOpen((prev) => !prev)}
       className={style.bellButton}
     >
       <img width={40} height={40} src="/icons/bell-icon.svg" alt="logo" />
-      {hasUnreadNotification ? (
+      {/* {hasUnreadNotification ? (
         <div className={style.numberBadge}>
           <svg
             width="25"
@@ -39,7 +39,7 @@ export const BellButton: FC<BellButtonProps> = ({ setIsCardOpen }) => {
             </div>
           </div>
         </div>
-      ) : null}
+      ) : null} */}
     </div>
   );
 };

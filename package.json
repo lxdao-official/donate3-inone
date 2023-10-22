@@ -12,7 +12,7 @@
     "@axelar-network/axelarjs-sdk": "^0.13.6",
     "@metamask/detect-provider": "^2.0.0",
     "@metamask/sdk": "^0.6.2",
-    "@notifi-network/notifi-react-card": "^0.86.0",
+    "@notifi-network/notifi-react-card": "0.58.0",
     "@rainbow-me/rainbowkit": "^1.0.11",
     "@types/node": "20.6.0",
     "@types/react": "18.2.21",

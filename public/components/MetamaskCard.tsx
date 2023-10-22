@@ -69,7 +69,7 @@ export const MetamaskCard = ({ address }: { address: string }) => {
               darkMode
               inputs={{ XMTPTopics: topics }}
               cardId="2b359c101cab48089e67fc0be580fade"
-              onClose={() => setIsCardOpen(false)}
+              // onClose={() => setIsCardOpen(false)}
             />
           ) : null}
         </div>
