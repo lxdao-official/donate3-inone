@@ -430,6 +430,7 @@ export default function Home() {
           signMessage={async (message: Uint8Array) => {
             //@ts-ignore
             const result = await signMessage(message) ?? "";
+            // @ts-ignore
             return getBytes(result);
           }}
           walletPublicKey={address ?? ''}
