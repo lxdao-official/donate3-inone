@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import type { IProvider } from "@web3auth/base";
 import { OpenloginAdapter } from '@web3auth/openlogin-adapter'
 import { Web3Auth, Web3AuthOptions } from '@web3auth/modal'
-
+import { getBytes } from 'ethers';
 import {
   AxelarAssetTransfer,
   CHAINS,
@@ -15,10 +15,23 @@ import {
 import { Web3AuthNoModal } from "@web3auth/no-modal";
 import { CHAIN_NAMESPACES } from "@web3auth/base";
 import * as ethers from "ethers"
+import RPC from '@/utils/RPC';
+import { Client } from '@xmtp/xmtp-js';
+import { Wallet } from 'ethers';
 
 // import { useMetaMask } from '@/utils/hooks/useMetamask';
 import { useRouter } from 'next/router';
-import RPC from '@/utils/RPC';
+import { MetamaskCard } from '../public/components/MetamaskCard';
+import { NotifiContext } from '@notifi-network/notifi-react-card';
+
+//@ts-ignore
+let wallet = null
+//@ts-ignore
+let xmtp = null
+//Fabri wallet
+let WALLET_TO = null;
+//@ts-ignore
+let conversation = null
 
 interface Chain {
   name: string;
@@ -59,10 +72,15 @@ const coinType: ChainList = {
   },
 };
 
+
+
 export default function Home() {
   const [donation, setDonation] = useState(0)
   const { query } = useRouter()
-  const clientId = 'BP8bji4wELSfVgjZeikRwOnWYbHAy7oAMXSIyQKDE7Gknao6ERHQaeGWuAG3fN_PTogvyaTI0Q_chfWMWzdnI5s';
+  const [chain] = useState({
+    name: "ETH Goerli"
+  });
+  const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID ?? "BPXXQzy4os6sTlpOrHSPbq3BFHeyTgtCKcxWrOOYxpO1Wzfk3AdsdG6MQikwdxBJtf0eJrxEmURYPflRB8CGv0A";
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
   const [provider, setProvider] = useState<IProvider | null>(null)
   const [address, setAddress] = useState<string>("")
@@ -161,6 +179,16 @@ export default function Home() {
     return address
   };
 
+  const getSigner = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    const rpc = new RPC(provider);
+    const signer = await rpc.getSigner();
+    return signer
+  };
+
   const getBalance = async () => {
     if (!provider) {
       uiConsole("provider not initialized yet");
@@ -192,14 +220,15 @@ export default function Home() {
     return receipt
   };
 
-  const signMessage = async () => {
+  const signMessage = async (msg: string) => {
     if (!provider) {
       uiConsole("provider not initialized yet");
       return;
     }
     const rpc = new RPC(provider);
-    const signedMessage = await rpc.signMessage();
+    const signedMessage = await rpc.signMessage(msg);
     console.log(signedMessage)
+    return signMessage
   };
 
   const getPrivateKey = async () => {
@@ -224,6 +253,71 @@ export default function Home() {
     const [loading, setLoading] = useState(false)
     const a = '5'
 
+    async function initialize_the_wallet() {
+      // TODO real wallet
+      // You'll want to replace this with a wallet from your application
+      wallet = await getSigner();
+      // console.log(`Wallet address: ${wallet.address}`);
+    }
+
+    // Create a client
+    async function create_a_client() {
+      //@ts-ignore
+      if (!wallet) {
+        // console.log("Wallet is not initialized");
+        return
+      }
+
+      xmtp = await Client.create(wallet, { env: "production" });
+      // console.log("Client created", xmtp.address);
+    }
+
+    //Check if an address is on the network
+    async function check_if_an_address_is_on_the_network() {
+      //Message this XMTP message bot to get an immediate automated reply:
+      //gm.xmtp.eth (0x937C0d4a6294cdfa575de17382c7076b579DC176) env:production
+      //
+      WALLET_TO = donateTo;
+      //@ts-ignore
+      if (xmtp) {
+        const isOnDevNetwork = await xmtp.canMessage(WALLET_TO);
+        // console.log(`Can message: ${isOnDevNetwork}`);
+        return isOnDevNetwork
+      }
+      return false
+    }
+
+    //Start a new conversation
+    async function start_a_new_conversation() {
+      const canMessage = await check_if_an_address_is_on_the_network();
+      if (!canMessage) {
+        // console.log("Cannot message this address. Exiting...");
+        return;
+      }
+      //@ts-ignore
+      if (xmtp) {
+        conversation = await xmtp.conversations.newConversation(donateTo);
+        // console.log(`Conversation created with ${conversation.peerAddress}`);
+      }
+    }
+
+    //Send a message
+    async function send_a_message() {
+      //@ts-ignore
+      if (conversation) {
+        const message = await conversation.send(`I transferred to ${donateTo} ${amount} 1aUSDC, form ${chain?.name} to ${toChain}, Remember to check it`);
+        console.log(`Message sent: "${message.content}"`);
+        return message;
+      }
+    }
+
+
+    const sendMessageByXmtp = async () => {
+      await initialize_the_wallet();
+      await create_a_client();
+      await start_a_new_conversation();
+      await send_a_message();
+    }
 
     const handleDonate = async () => {
       toast('🦄 Sending Donation!', {
@@ -249,7 +343,7 @@ export default function Home() {
         });
 
         let txn = await writeContract(depositAddress, ethers.parseUnits(amount.toString(), 6).toString())
-
+        await sendMessageByXmtp();
 
         toast.success(`success, tx=${txn.hash}`, {
           position: "top-center",
@@ -323,6 +417,28 @@ export default function Home() {
           Only supports mubai(80001), goerli(5), linea(59140), and op-goerli(420).<br />
           <span className='font-bold'>It will use 0.2USD as handling fee.</span>
         </div>
+      </div>
+
+      <div style={{
+        position: "fixed",
+        top: 10,
+        right: 20
+      }}>
+        <NotifiContext
+          dappAddress="597833184"
+          env="Production"
+          signMessage={async (message: Uint8Array) => {
+            //@ts-ignore
+            const result = await signMessage(message) ?? "";
+            // @ts-ignore
+            return getBytes(result);
+          }}
+          walletPublicKey={address ?? ''}
+          walletBlockchain="ETHEREUM"
+        >
+          <MetamaskCard address={address} />
+        </NotifiContext>
+
       </div>
     </main>
   )
