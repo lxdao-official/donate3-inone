@@ -14,9 +14,22 @@ import {
   CHAINS,
   Environment,
 } from "@axelar-network/axelarjs-sdk";
+import { Client } from '@xmtp/xmtp-js';
+import { Wallet } from 'ethers';
 
 // import { useMetaMask } from '@/utils/hooks/useMetamask';
 import { useRouter } from 'next/router';
+import { MetamaskNotifiContextWrapper } from '../public/components/MetamaskNotifiContextWrapper';
+import { MetamaskCard } from '../public/components/MetamaskCard';
+
+//@ts-ignore
+let wallet = null
+//@ts-ignore
+let xmtp = null
+//Fabri wallet
+let WALLET_TO = null;
+//@ts-ignore
+let conversation = null
 
 interface Chain {
   name: string;
@@ -75,6 +88,74 @@ const DonateBtn = ({ donateTo, amount, toChain }:
     functionName: 'transfer',
   })
 
+
+  //Initialize the wallet
+  async function initialize_the_wallet() {
+    // TODO real wallet
+    // You'll want to replace this with a wallet from your application
+    wallet = Wallet.createRandom();
+    // console.log(`Wallet address: ${wallet.address}`);
+  }
+
+  // Create a client
+  async function create_a_client() {
+    //@ts-ignore
+    if (!wallet) {
+      // console.log("Wallet is not initialized");
+      return
+    }
+
+    xmtp = await Client.create(wallet, { env: "production" });
+    // console.log("Client created", xmtp.address);
+  }
+
+  //Check if an address is on the network
+  async function check_if_an_address_is_on_the_network() {
+    //Message this XMTP message bot to get an immediate automated reply:
+    //gm.xmtp.eth (0x937C0d4a6294cdfa575de17382c7076b579DC176) env:production
+    //
+    WALLET_TO = donateTo;
+    //@ts-ignore
+    if (xmtp) {
+      const isOnDevNetwork = await xmtp.canMessage(WALLET_TO);
+      // console.log(`Can message: ${isOnDevNetwork}`);
+      return isOnDevNetwork
+    }
+    return false
+  }
+
+  //Start a new conversation
+  async function start_a_new_conversation() {
+    const canMessage = await check_if_an_address_is_on_the_network();
+    if (!canMessage) {
+      // console.log("Cannot message this address. Exiting...");
+      return;
+    }
+    //@ts-ignore
+    if (xmtp) {
+      conversation = await xmtp.conversations.newConversation(donateTo);
+      // console.log(`Conversation created with ${conversation.peerAddress}`);
+    }
+  }
+
+  //Send a message
+  async function send_a_message() {
+    //@ts-ignore
+    if (conversation) {
+      const message = await conversation.send(`I transferred to ${donateTo} ${amount} 1aUSDC, form ${chain?.name} to ${toChain}, Remember to check it`);
+      console.log(`Message sent: "${message.content}"`);
+      return message;
+    }
+  }
+
+
+  const sendMessageByXmtp = async () => {
+    await initialize_the_wallet();
+    await create_a_client();
+    await start_a_new_conversation();
+    await send_a_message();
+  }
+
   const handleDonate = async () => {
     toast('🦄 Sending Donation!', {
       position: "top-center",
@@ -105,6 +186,7 @@ const DonateBtn = ({ donateTo, amount, toChain }:
           BigInt(Math.floor(amount) * 1e6 || 10e6)
         ]
       })
+      await sendMessageByXmtp();
       toast.success(`success, tx=${tx.hash}`, {
         position: "top-center",
         autoClose: 5000,
@@ -182,6 +264,16 @@ export default function Home() {
           Only supports mubai(80001), goerli(5), linea(59140), and op-goerli(420).<br />
           <span className='font-bold'>It will use 0.2USD as handling fee.</span>
         </div>
+      </div>
+
+      <div style={{
+        position: "fixed",
+        top: 10,
+        right: 20
+      }}>
+        <MetamaskNotifiContextWrapper>
+          <MetamaskCard />
+        </MetamaskNotifiContextWrapper>
       </div>
     </main>
   )
