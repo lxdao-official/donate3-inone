@@ -292,6 +292,7 @@ export default function Home() {
       attestationSignature
     );
     receipt = await tx1.wait();
+    console.log(tx1.hash);
     return receipt;
   };
 
@@ -462,10 +463,10 @@ export default function Home() {
           <div className="flex justify-center items-center gap-3 border  border-[#d0fb51] text-[12px] rounded-md w-[calc(50vw_-_240px)] h-[40px] p-2">
             <img
               className="w-[30px] h-[30px] bg-[#fff] rounded-full"
-              src={coinType["420"]?.icon ?? "/icons/delete.png"}
+              src={coinType["5"]?.icon ?? "/icons/delete.png"}
               alt=""
             />
-            {coinType["420"]?.name ?? "NotConnect"}
+            {coinType["5"]?.name ?? "NotConnect"}
           </div>
           <img width="20px" src="./ar.png" alt="" />
           <div className="flex justify-center items-center gap-3 border  border-[#d0fb51] text-[12px] rounded-md w-[calc(50vw_-_240px)] h-[40px] p-2">
