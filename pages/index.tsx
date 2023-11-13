@@ -9,26 +9,22 @@ import { OpenloginAdapter } from "@web3auth/openlogin-adapter";
 import { Web3Auth, Web3AuthOptions } from "@web3auth/modal";
 import { Signer, getBytes } from "ethers";
 import {
+  decodeAbiParameters,
   encodeAbiParameters,
-  hexToBytes,
   keccak256,
   parseAbiParameters,
 } from "viem";
-import { Web3AuthNoModal } from "@web3auth/no-modal";
 import { CHAIN_NAMESPACES } from "@web3auth/base";
 import { ethers } from "ethers";
 import RPC from "@/utils/RPC";
 import { Client } from "@xmtp/xmtp-js";
 import ERC20ABI from "@/abi/ERC20.json";
+import MessageTransmitterABI from "@/abi/MessageTransmitter.json";
 // import { useMetaMask } from '@/utils/hooks/useMetamask';
 import { useRouter } from "next/router";
 import { MetamaskCard } from "../public/components/MetamaskCard";
 import { NotifiContext } from "@notifi-network/notifi-react-card";
-import { createPublicClient, http } from "viem";
-import { fantom } from "viem/chains";
 
-//@ts-ignore
-let wallet = null;
 //@ts-ignore
 let xmtp = null;
 //Fabri wallet
@@ -54,7 +50,7 @@ const coinType: ChainList = {
   },
   "59140": {
     name: "Avalanche",
-    icon: "/icons/support/linea.svg",
+    icon: "/icons/support/avax.png",
     index: 1,
   },
   "420": {
@@ -78,7 +74,7 @@ export default function Home() {
   const [donation, setDonation] = useState(0);
   const { query } = useRouter();
   const [chain] = useState({
-    name: "ETH Goerli",
+    name: "Op Goerli",
   });
   const clientId =
     process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID ??
@@ -144,9 +140,13 @@ export default function Home() {
     console.log(private_key);
     savePrviateKey(private_key as string);
 
-    let signer = new ethers.Wallet(private_key, web3authProvider);
+    let signer = new ethers.Wallet(
+      // @ts-ignore
+      private_key,
+      new ethers.JsonRpcProvider("https://rpc.ankr.com/eth_goerli")
+    );
     setSigner(signer);
-    setAddress(await getAccounts());
+    setAddress(await signer.getAddress());
   };
 
   const authenticateUser = async () => {
@@ -176,15 +176,6 @@ export default function Home() {
     setProvider(null);
   };
 
-  const getChainId = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const chainId = await rpc.getChainId();
-    uiConsole(chainId);
-  };
   const getAccounts = async () => {
     if (!provider) {
       uiConsole("provider not initialized yet");
@@ -194,36 +185,6 @@ export default function Home() {
     const address = await rpc.getAccounts();
     console.log(address);
     return address;
-  };
-
-  const getSigner = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const signer = await rpc.getSigner();
-    return signer;
-  };
-
-  const getBalance = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const balance = await rpc.getBalance();
-    uiConsole(balance);
-  };
-
-  const sendTransaction = async (address: string, token: string) => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const receipt = await rpc.sendTransaction(address, token);
-    return receipt;
   };
 
   const writeContract = async (
@@ -278,7 +239,7 @@ export default function Home() {
       mintRecipient,
       "0x07865c6E87B9F70255377e024ace6630C1Eaa37F"
     );
-    const receipt = await tx.wait();
+    let receipt = await tx.wait();
 
     let toChainClientSigner = new ethers.Wallet(
       privateKey,
@@ -287,9 +248,10 @@ export default function Home() {
           "59140": {
             url: `https://rpc.ankr.com/avalanche_fuji`,
           },
-        }[toChain]?.url
+        }["59140"]?.url
       )
     );
+    // @ts-ignore
     let log = receipt.logs.find((log) => {
       return (
         log.topics.length == 1 &&
@@ -298,24 +260,38 @@ export default function Home() {
       );
     });
     console.log(log.data);
-    const messageBytes = hexToBytes(log.data);
-    console.log(messageBytes);
+    let messageBytes = decodeAbiParameters(
+      parseAbiParameters("bytes"),
+      log.data
+    )[0];
+    console.log(log.data);
     const messageHash = keccak256(messageBytes);
 
     console.log(messageHash);
-    let attestationResponse;
-    const response = await fetch(
-      `https://iris-api-sandbox.circle.com/attestations/${messageHash}`
-    );
-    attestationResponse = await response.json();
+    let callCount = 0;
+    const maxCalls = 5;
+    const intervalTime = 7000; // 5秒间隔
+    let attestationResponse = { status: "pending" };
+    while (attestationResponse.status != "complete") {
+      const response = await fetch(
+        `https://iris-api-sandbox.circle.com/attestations/${messageHash}`
+      );
+      attestationResponse = await response.json();
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+    // @ts-ignore
     const attestationSignature = attestationResponse.attestation;
     console.log(`Signature: ${attestationSignature}`);
-    // let mint_contract = new ethers.Contract("", [], toChainClientSigner);
-    // receipt.logs.map((log) => {
-    //   return log.topics.map((topic) => {
-    //     return ethers.utils.hexDataSlice(topic, 12);
-    //   });
-    // }));
+    let mint_contract = new ethers.Contract(
+      "0xa9fb1b3009dcb79e2fe346c16a604b8fa8ae0a79",
+      MessageTransmitterABI,
+      toChainClientSigner
+    );
+    let tx1 = await mint_contract.receiveMessage(
+      messageBytes,
+      attestationSignature
+    );
+    receipt = await tx1.wait();
     return receipt;
   };
 
@@ -328,17 +304,6 @@ export default function Home() {
     console.log(signedMessage);
     return signMessage;
   };
-
-  const getPrivateKey = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const privateKey = await rpc.getPrivateKey();
-    uiConsole(privateKey);
-  };
-
   function uiConsole(...args: any[]): void {
     const el = document.querySelector("#console>p");
     if (el) {
@@ -359,23 +324,15 @@ export default function Home() {
     // const { wallet, hasProvider, connectMetaMask } = useMetaMask();
     const [loading, setLoading] = useState(false);
     const a = "5";
-
-    async function initialize_the_wallet() {
-      // TODO real wallet
-      // You'll want to replace this with a wallet from your application
-      wallet = await getSigner();
-      // console.log(`Wallet address: ${wallet.address}`);
-    }
-
     // Create a client
     async function create_a_client() {
       //@ts-ignore
-      if (!wallet) {
+      if (!signer) {
         // console.log("Wallet is not initialized");
         return;
       }
 
-      xmtp = await Client.create(wallet, { env: "production" });
+      xmtp = await Client.create(signer, { env: "production" });
       // console.log("Client created", xmtp.address);
     }
 
@@ -421,7 +378,6 @@ export default function Home() {
     }
 
     const sendMessageByXmtp = async () => {
-      await initialize_the_wallet();
       await create_a_client();
       await start_a_new_conversation();
       await send_a_message();
@@ -506,19 +462,19 @@ export default function Home() {
           <div className="flex justify-center items-center gap-3 border  border-[#d0fb51] text-[12px] rounded-md w-[calc(50vw_-_240px)] h-[40px] p-2">
             <img
               className="w-[30px] h-[30px] bg-[#fff] rounded-full"
-              src={5 ? coinType[5 + ""]?.icon : "/icons/delete.png"}
+              src={coinType["420"]?.icon ?? "/icons/delete.png"}
               alt=""
             />
-            {5 ? coinType[5 + ""]?.name : "NotConnect"}
+            {coinType["420"]?.name ?? "NotConnect"}
           </div>
           <img width="20px" src="./ar.png" alt="" />
           <div className="flex justify-center items-center gap-3 border  border-[#d0fb51] text-[12px] rounded-md w-[calc(50vw_-_240px)] h-[40px] p-2">
             <img
               className="w-[30px] h-[30px] bg-[#132333] rounded-full"
-              src={coinType[(query.toChain as string) || 420]?.icon}
+              src={coinType[(query.toChain as string) || "59140"]?.icon}
               alt=""
             />
-            {coinType[(query.toChain as string) || 420]?.name}
+            {coinType[(query.toChain as string) || "59140"]?.name}
           </div>
         </div>
         <div className="w-full h-[60px] flex justify-center items-center rounded-lg border border-[#d0fb51] bg-[#d0fb5166] gap-4">
@@ -554,7 +510,7 @@ export default function Home() {
               : "0xb15115A15d5992A756D003AE74C0b832918fAb75"
           }
           amount={donation}
-          toChain={(query.toChain as string) || "420"}
+          toChain={(query.toChain as string) || "59140"}
           address={address}
         />
         <div className="w-full p-2  rounded-lg border border-[#d0fb51] text-[#91ae39] bg-[#d0fb5166] gap-4">
